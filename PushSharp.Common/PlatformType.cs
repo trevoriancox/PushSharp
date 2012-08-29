@@ -13,6 +13,7 @@ namespace PushSharp.Common
 		Windows,
 		WindowsPhone,
 		Blackberry,
+		WebNotification,
         None
 	}
 }

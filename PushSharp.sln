@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PushSharp.Sample", "PushSha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PushSharp.Windows", "PushSharp.Windows\PushSharp.Windows.csproj", "{0EC3A31E-B869-4465-ABDC-90C2E3CCC17D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PushSharp.WebNotifications", "PushSharp.WebNotifications\PushSharp.WebNotifications.csproj", "{0519771B-4F4E-4520-A392-59162F5EAF23}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +33,16 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{0519771B-4F4E-4520-A392-59162F5EAF23}.Release|x86.ActiveCfg = Release|Any CPU
 		{09414728-3728-4105-A149-EC2E315355F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{09414728-3728-4105-A149-EC2E315355F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{09414728-3728-4105-A149-EC2E315355F9}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
@@ -116,6 +128,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{0519771B-4F4E-4520-A392-59162F5EAF23} = {C09BBA3E-9CF3-4479-A4C3-3006820E2046}
 		{0EC3A31E-B869-4465-ABDC-90C2E3CCC17D} = {C09BBA3E-9CF3-4479-A4C3-3006820E2046}
 		{1B9A3A8B-3690-4435-BF9C-B557BF2713DB} = {04A9AE38-795E-4CB5-A9AD-C1FA83DC342C}
 		{5250980B-BD11-4201-B083-AEDB8C62C471} = {C09BBA3E-9CF3-4479-A4C3-3006820E2046}

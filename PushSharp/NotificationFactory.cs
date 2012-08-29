@@ -14,13 +14,15 @@ namespace PushSharp
 				case Common.PlatformType.Apple:
 					return Apple();
 				case Common.PlatformType.AndroidC2dm:
-          return AndroidC2dm();
-        case Common.PlatformType.AndroidGcm:
-          return AndroidGcm();
+					return AndroidC2dm();
+				case Common.PlatformType.AndroidGcm:
+					return AndroidGcm();
 				case Common.PlatformType.Windows:
 					return Windows();
 				case Common.PlatformType.WindowsPhone:
 					return WindowsPhone();
+				case Common.PlatformType.WebNotification:
+					return Web();
 				case Common.PlatformType.Blackberry:
 					return Blackberry();
 				default:
@@ -57,6 +59,11 @@ namespace PushSharp
 		public static Windows.WindowsNotificationFactory Windows()
 		{
 			return new Windows.WindowsNotificationFactory();
+		}
+
+		public static WebNotifications.WebNotification Web()
+		{
+			return new WebNotifications.WebNotification();
 		}
 	}
 }

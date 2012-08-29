@@ -1,15 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{09414728-3728-4105-A149-EC2E315355F9}</ProjectGuid>
+    <ProjectGuid>{0519771B-4F4E-4520-A392-59162F5EAF23}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>PushSharp</RootNamespace>
-    <AssemblyName>PushSharp</AssemblyName>
+    <RootNamespace>PushSharp.WebNotifications</RootNamespace>
+    <AssemblyName>PushSharp.WebNotifications</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -30,6 +30,18 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.4.5.8\lib\net40\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="SignalR">
+      <HintPath>..\packages\SignalR.Server.0.5.3\lib\net40\SignalR.dll</HintPath>
+    </Reference>
+    <Reference Include="SignalR.Hosting.Common">
+      <HintPath>..\packages\SignalR.Hosting.Common.0.5.3\lib\net40\SignalR.Hosting.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="SignalR.Hosting.Self">
+      <HintPath>..\packages\SignalR.Hosting.Self.0.5.3\lib\net40\SignalR.Hosting.Self.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -42,38 +54,20 @@
     <Compile Include="..\PushSharp.Common\AssemblyVersionInfo.cs">
       <Link>AssemblyVersionInfo.cs</Link>
     </Compile>
-    <Compile Include="NotificationFactory.cs" />
-    <Compile Include="PushService.cs" />
+    <Compile Include="WebNotification.cs" />
+    <Compile Include="WebNotificationFluent.cs" />
+    <Compile Include="WebNotificationPushChannel.cs" />
+    <Compile Include="WebNotificationPushChannelSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WebNotificationPushService.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\PushSharp.Android\PushSharp.Google.csproj">
-      <Project>{71E27C37-FBBF-481B-934B-1F7DBDE3C5D6}</Project>
-      <Name>PushSharp.Google</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PushSharp.Apple\PushSharp.Apple.csproj">
-      <Project>{83C67156-893D-4AFF-9169-DB34771989CB}</Project>
-      <Name>PushSharp.Apple</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PushSharp.Blackberry\PushSharp.Blackberry.csproj">
-      <Project>{5250980B-BD11-4201-B083-AEDB8C62C471}</Project>
-      <Name>PushSharp.Blackberry</Name>
-    </ProjectReference>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\PushSharp.Common\PushSharp.Common.csproj">
-      <Project>{836F225F-6CD9-48DE-910C-70F8A7CF54AA}</Project>
+      <Project>{836f225f-6cd9-48de-910c-70f8a7cf54aa}</Project>
       <Name>PushSharp.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PushSharp.WebNotifications\PushSharp.WebNotifications.csproj">
-      <Project>{0519771b-4f4e-4520-a392-59162f5eaf23}</Project>
-      <Name>PushSharp.WebNotifications</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PushSharp.WindowsPhone\PushSharp.WindowsPhone.csproj">
-      <Project>{9947F510-BA9A-4045-A648-BAB687D8F513}</Project>
-      <Name>PushSharp.WindowsPhone</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PushSharp.Windows\PushSharp.Windows.csproj">
-      <Project>{0ec3a31e-b869-4465-abdc-90c2e3ccc17d}</Project>
-      <Name>PushSharp.Windows</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

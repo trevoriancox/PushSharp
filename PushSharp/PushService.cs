@@ -19,6 +19,7 @@ namespace PushSharp
 		Windows.WindowsPushService winService = null;
 		Blackberry.BlackberryPushService bbService = null;
 		Android.GcmPushService gcmService = null;
+		WebNotifications.WebNotificationPushService webService = null;
 
 		static PushService instance = null;
 		public static PushService Instance
@@ -116,6 +117,18 @@ namespace PushSharp
 				bbService.Stop(waitForQueueToFinish);
 		}
 
+		public void StartWebNotificationService(WebNotifications.WebNotificationPushChannelSettings channelSettings, PushServiceSettings serviceSettings = null)
+		{
+			webService = new WebNotifications.WebNotificationPushService(channelSettings, serviceSettings);
+			webService.Events.RegisterProxyHandler(this.Events);
+		}
+
+		public void StopWebNotificationService(bool waitForQueueToFinish = true)
+		{
+			if (webService != null)
+				webService.Stop(waitForQueueToFinish);
+		}
+
 		public void QueueNotification(Notification notification)
 		{
 			switch (notification.Platform)
@@ -134,6 +147,9 @@ namespace PushSharp
 					break;
 				case PlatformType.Windows:
 					winService.QueueNotification(notification);
+					break;
+				case PlatformType.WebNotification:
+					webService.QueueNotification(notification);
 					break;
 				case PlatformType.Blackberry:
 					bbService.QueueNotification(notification);
@@ -162,6 +178,9 @@ namespace PushSharp
 
 			if (bbService != null && !bbService.IsStopping)
 				tasks.Add(Task.Factory.StartNew(() => bbService.Stop(waitForQueuesToFinish)));
+
+			if (webService != null && !webService.IsStopping)
+				tasks.Add(Task.Factory.StartNew(() => webService.Stop(waitForQueuesToFinish)));
 
 			Task.WaitAll(tasks.ToArray());
 		}
