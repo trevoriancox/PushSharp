@@ -13,8 +13,8 @@ using Android.Util;
 
 namespace GCMSharp.Client
 {
-  [Android.Runtime.Preserve(AllMembers=true)]
-	public abstract class GCMBaseIntentService : IntentService
+  	[Android.Runtime.Preserve(AllMembers=true)]
+	internal abstract class GCMBaseIntentService : IntentService
 	{
 		const string TAG = "GCMBaseIntentService";
 
@@ -23,7 +23,7 @@ namespace GCMSharp.Client
 
 		static object LOCK = new object();
 
-		string mSenderId;
+		string[] mSenderIds;
 		//int sCounter = 1;
 		Random sRandom = new Random();
 
@@ -34,9 +34,9 @@ namespace GCMSharp.Client
 
 		protected GCMBaseIntentService() : base() {}
 
-		public GCMBaseIntentService(string senderId) : base("GCMIntentService-" + senderId)
+		public GCMBaseIntentService(string[] senderIds) : base("GCMIntentService")
 		{
-			mSenderId = senderId;
+			mSenderIds = senderIds;
 		}
 
 
@@ -117,7 +117,7 @@ namespace GCMSharp.Client
 					if (GCMRegistrar.IsRegistered(context))
 						GCMRegistrar.internalUnRegister(context);
 					else
-						GCMRegistrar.internalRegister(context, mSenderId);
+						GCMRegistrar.internalRegister(context, mSenderIds);
 				}
 			}
 			finally

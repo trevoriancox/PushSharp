@@ -13,19 +13,28 @@ using Android.Util;
 
 namespace GCMSharp.Client
 {
-	public class GCMBroadcastReceiver<TIntentService> : BroadcastReceiver where TIntentService : GCMBaseIntentService
+	[BroadcastReceiver(Permission=GCMConstants.PERMISSION_GCM_INTENTS)]
+	[IntentFilter(new string[] { GCMConstants.INTENT_FROM_GCM_MESSAGE },
+	Categories = new string[] { "@PACKAGE_NAME@" })]
+	[IntentFilter(new string[] { GCMConstants.INTENT_FROM_GCM_REGISTRATION_CALLBACK },
+	Categories = new string[] { "@PACKAGE_NAME@" })]
+	[IntentFilter(new string[] { GCMConstants.INTENT_FROM_GCM_LIBRARY_RETRY },
+	Categories = new string[] { "@PACKAGE_NAME@" })]
+	internal class GCMBroadcastReceiver : BroadcastReceiver
 	{
-		const string TAG = "GCMBroadcastReceiver";
+		public const string TAG = "GCMBroadcastReceiver";
 
 		public override void OnReceive(Context context, Intent intent)
 		{
 			Log.Verbose(TAG, "OnReceive: " + intent.Action);
 			var className = context.PackageName + GCMConstants.DEFAULT_INTENT_SERVICE_CLASS_NAME;
 
-			Log.Verbose(TAG, "GCM IntentService Class: " + className);
+			Log.Verbose(TAG, "IntentService Class: " + className);
 
-			GCMBaseIntentService.RunIntentInService(context, intent, typeof(TIntentService));
+			GCMBaseIntentService.RunIntentInService(context, intent, typeof(GCMService));
 			SetResult(Result.Ok, null, null);
 		}
 	}
+
+
 }

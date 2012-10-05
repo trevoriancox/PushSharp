@@ -40,9 +40,7 @@ namespace PushSharp.ClientSample.MonoForAndroid
 			Log.Info(TAG, "Hello World");
 
 			//Check to ensure everything's setup right
-			GCMSharp.Client.GCMRegistrar.CheckDevice(this);
-			GCMSharp.Client.GCMRegistrar.CheckManifest(this);
-								
+			GcmHandler.Initialize(this);
 
 			this.buttonRegister.Click += delegate
 			{
@@ -51,14 +49,14 @@ namespace PushSharp.ClientSample.MonoForAndroid
 					Log.Info(TAG, "Registering...");
 
 					//Call to register
-					GCMSharp.Client.GCMRegistrar.Register(this, SampleBroadcastReceiver.SENDER_ID);
+					GcmHandler.Register(this);
 				}
 				else
 				{
 					Log.Info(TAG, "Unregistering...");
 
 					//Call to unregister
-					GCMSharp.Client.GCMRegistrar.UnRegister(this);
+					GcmHandler.UnRegister(this);
 				}
 
 				RunOnUiThread(() =>
@@ -80,7 +78,7 @@ namespace PushSharp.ClientSample.MonoForAndroid
 		void updateView()
 		{
 			//Get the stored latest registration id
-			var registrationId = GCMSharp.Client.GCMRegistrar.GetRegistrationId(this);
+			var registrationId = GcmHandler.GetRegistrationId(this);
 					
 			//If it's empty, we need to register
 			if (string.IsNullOrEmpty(registrationId))

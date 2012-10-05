@@ -13,7 +13,7 @@ using Android.Util;
 
 namespace GCMSharp.Client
 {
-	public class GCMRegistrar
+	internal class GCMRegistrar
 	{
 		const string TAG = "GCMRegistrar";
 		const string BACKOFF_MS = "backoff_ms";
