@@ -166,5 +166,17 @@ namespace PushSharp.Apple
             get;
             set;
         }
+
+        public void OverrideEndpoint(string newHost, int newPort)
+        {
+            this.Host = newHost;
+            this.Port = newPort;
+        }
+
+        public void OverrideFeedbackEndpoint(string newHost, int newPort)
+        {
+            this.FeedbackHost = newHost;
+            this.FeedbackPort = newPort;
+        }
 	}
 }
