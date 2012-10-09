@@ -22,37 +22,39 @@ namespace PushSharp.Apple
 		private const int APNS_PRODUCTION_FEEDBACK_PORT = 2196;
 		#endregion
 
-		public ApplePushChannelSettings(bool production, string certificateFile, string certificateFilePwd) 
-			: this(production, System.IO.File.ReadAllBytes(certificateFile), certificateFilePwd) { }
+		public ApplePushChannelSettings(bool production, string certificateFile, string certificateFilePwd, bool disableCertificateCheck = false) 
+			: this(production, System.IO.File.ReadAllBytes(certificateFile), certificateFilePwd, disableCertificateCheck) { }
 
-		public ApplePushChannelSettings(string certificateFile, string certificateFilePwd)
-			: this(System.IO.File.ReadAllBytes(certificateFile), certificateFilePwd) { }
+		public ApplePushChannelSettings(string certificateFile, string certificateFilePwd, bool disableCertificateCheck = false)
+			: this(System.IO.File.ReadAllBytes(certificateFile), certificateFilePwd, disableCertificateCheck) { }
+
 
 		//Need to load the private key seperately from apple
 		// Fixed by danielgindi@gmail.com :
 		//      The default is UserKeySet, which has caused internal encryption errors,
 		//      Because of lack of permissions on most hosting services.
 		//      So MachineKeySet should be used instead.
-		public ApplePushChannelSettings(bool production, byte[] certificateData, string certificateFilePwd)
+        public ApplePushChannelSettings(bool production, byte[] certificateData, string certificateFilePwd, bool disableCertificateCheck = false)
 			: this(production, new X509Certificate2(certificateData, certificateFilePwd,
-				X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable)) { }
+				X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable), disableCertificateCheck) { }
 
-		public ApplePushChannelSettings(byte[] certificateData, string certificateFilePwd)
+        public ApplePushChannelSettings(byte[] certificateData, string certificateFilePwd, bool disableCertificateCheck = false)
 			: this(new X509Certificate2(certificateData, certificateFilePwd,
-				X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable)) { }
+				X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable), disableCertificateCheck) { }
 
-		public ApplePushChannelSettings(X509Certificate2 certificate)
+        public ApplePushChannelSettings(X509Certificate2 certificate, bool disableCertificateCheck = false)
 		{
-			Initialize(DetectProduction(certificate), certificate);
+			Initialize(DetectProduction(certificate), certificate, disableCertificateCheck);
 		}
 
-		public ApplePushChannelSettings(bool production, X509Certificate2 certificate)
+        public ApplePushChannelSettings(bool production, X509Certificate2 certificate, bool disableCertificateCheck = false)
 		{
-			Initialize(production, certificate);
+			Initialize(production, certificate, disableCertificateCheck);
 		}
 
-		void Initialize(bool production, X509Certificate2 certificate)
+        void Initialize(bool production, X509Certificate2 certificate, bool disableCertificateCheck = false)
 		{
+            this.DisableCertificateCheck = disableCertificateCheck;
 			this.Host = production ? APNS_PRODUCTION_HOST : APNS_SANDBOX_HOST;
 			this.FeedbackHost = production ? APNS_PRODUCTION_FEEDBACK_HOST : APNS_SANDBOX_FEEDBACK_HOST;
 			this.Port = production ? APNS_PRODUCTION_PORT : APNS_SANDBOX_PORT;
@@ -65,7 +67,8 @@ namespace PushSharp.Apple
 			this.FeedbackIntervalMinutes = 10;
 			this.FeedbackTimeIsUTC = false;
 
-			CheckProductionCertificateMatching(production);
+            if (!this.DisableCertificateCheck)
+			    CheckProductionCertificateMatching(production);
 		}
 
 		public bool DetectProduction(X509Certificate2 certificate)
@@ -93,10 +96,9 @@ namespace PushSharp.Apple
 				if (!issuerName.Contains("Apple"))
 					throw new ArgumentException("Your Certificate does not appear to be issued by Apple!  Please check to ensure you have the correct certificate!");
 
-				if (production && !subjectName.Contains("Apple Production IOS Push Services"))
+				if (production && !(subjectName.Contains("Apple Production IOS Push Services") || subjectName.Contains("com.apple.mgmt.External.")))
 					throw new ArgumentException("You have selected the Production server, yet your Certificate does not appear to be the Production certificate!  Please check to ensure you have the correct certificate!");
-
-
+                
 				if (!production && !subjectName.Contains("Apple Development IOS Push Services"))
 						throw new ArgumentException("You have selected the Development/Sandbox (Not production) server, yet your Certificate does not appear to be the Development/Sandbox certificate!  Please check to ensure you have the correct certificate!");				
 			}
@@ -155,5 +157,14 @@ namespace PushSharp.Apple
 			get;
 			set;
 		}
+
+        /// <summary>
+        /// If false, the certificate's issuer and subject will not be checked to try and prevent common certificate sandbox/production mismatch mistakes!  If you are sending MDM notifications you may need this to be set!
+        /// </summary>
+        public bool DisableCertificateCheck
+        {
+            get;
+            set;
+        }
 	}
 }
