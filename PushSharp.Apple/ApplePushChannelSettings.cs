@@ -75,9 +75,9 @@ namespace PushSharp.Apple
 		{
 			bool production = false;
 
-			if (this.Certificate != null)
+			if (certificate != null)
 			{
-				var subjectName = this.Certificate.SubjectName.Name;
+				var subjectName = certificate.SubjectName.Name;
 
 				if (subjectName.Contains("Apple Production IOS Push Services"))
 					production = true;
