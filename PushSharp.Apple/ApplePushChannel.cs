@@ -224,7 +224,7 @@ namespace PushSharp.Apple
 						{
 							var bytesRead = networkStream.EndRead(asyncResult);
 
-							if (bytesRead > 0)
+							if (bytesRead >= 6) // should be 6
 							{
 								//We now expect apple to close the connection on us anyway, so let's try and close things
 								// up here as well to get a head start
@@ -236,8 +236,12 @@ namespace PushSharp.Apple
 								catch { }
 
 								//Get the enhanced format response
-								// byte 0 is always '1', byte 1 is the status, bytes 2,3,4,5 are the identifier of the notification
-								var status = readBuffer[1];
+								// byte 0 is always '8', byte 1 is the status, bytes 2,3,4,5 are the identifier of the notification
+								if(8 != readBuffer[0]) {
+									Console.WriteLine ("Unexpected byte 0: " + readBuffer[0]);
+								}
+
+								byte status = readBuffer[1];
 								var identifier = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(readBuffer, 2));
 
 								HandleFailedNotification(identifier, status);
@@ -252,6 +256,7 @@ namespace PushSharp.Apple
 						}
 						catch
 						{
+							Console.WriteLine("Unknown exception in networkStream.EndRead");
 							connected = false;
 						}
 
