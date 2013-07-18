@@ -13,7 +13,9 @@ obj
 *.resharper
 *.svn
 *.sln.DotSettings.user
-
+*.crx
+*.pem
+*.csproj.user
 
 
 # mstest test results

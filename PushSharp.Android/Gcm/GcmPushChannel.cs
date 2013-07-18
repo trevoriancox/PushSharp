@@ -18,16 +18,27 @@ namespace PushSharp.Android
 	{
 		GcmPushChannelSettings gcmSettings = null;
 		long waitCounter = 0;
+		static Version assemblyVerison;
 
 		public GcmPushChannel(GcmPushChannelSettings channelSettings)
 		{
-			gcmSettings = channelSettings as GcmPushChannelSettings;	
-		}
+			gcmSettings = channelSettings;
+
+            if (gcmSettings != null && gcmSettings.ValidateServerCertificate)
+            {
+                ServicePointManager.ServerCertificateValidationCallback += ValidateRemoteCertificate;
+            }
+            else
+            {
+                ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, policyErrs) => true; //Don't validate remote cert
+            }
+        }
 
 
 		static GcmPushChannel()
 		{
 			ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, policyErrs) => { return true; };
+			assemblyVerison = System.Reflection.Assembly.GetExecutingAssembly ().GetName ().Version;
 		}
 		
 		public void SendNotification(INotification notification, SendNotificationCallbackDelegate callback)
@@ -37,14 +48,14 @@ namespace PushSharp.Android
 			var result = new GcmMessageTransportResponse();
 			result.Message = msg;
 						
-			var postData = msg.GetJson();
+			//var postData = msg.GetJson();
 
 			var webReq = (HttpWebRequest)WebRequest.Create(gcmSettings.GcmUrl);
 			//webReq.ContentLength = postData.Length;
 			webReq.Method = "POST";
 			webReq.ContentType = "application/json";
 			//webReq.ContentType = "application/x-www-form-urlencoded;charset=UTF-8   can be used for plaintext bodies
-			webReq.UserAgent = "PushSharp (version: 1.0)";
+			webReq.UserAgent = "PushSharp (version: " + assemblyVerison.ToString () + ")";
 			webReq.Headers.Add("Authorization: key=" + gcmSettings.SenderAuthToken);
 
 			webReq.BeginGetRequestStream(new AsyncCallback(requestStreamCallback), new GcmAsyncParameters()
@@ -135,15 +146,18 @@ namespace PushSharp.Android
 			//Get the response body
 			var json = new JObject();
 
-			try { json = JObject.Parse((new StreamReader(asyncParam.WebResponse.GetResponseStream())).ReadToEnd()); }
+		    var str = string.Empty;
+
+			try { str = (new StreamReader(asyncParam.WebResponse.GetResponseStream())).ReadToEnd(); }
 			catch { }
 
+		    try { json = JObject.Parse(str); }
+		    catch { }
 
 			result.NumberOfCanonicalIds = json.Value<long>("canonical_ids");
 			result.NumberOfFailures = json.Value<long>("failure");
 			result.NumberOfSuccesses = json.Value<long>("success");
-
-		
+					
 			var jsonResults = json["results"] as JArray;
 
 			if (jsonResults == null)
@@ -165,7 +179,7 @@ namespace PushSharp.Android
 				{
 					var err = r.Value<string>("error") ?? "";
 
-					switch (err.ToLower().Trim())
+					switch (err.ToLowerInvariant().Trim())
 					{
 						case "ok":
 							msgResult.ResponseStatus = GcmMessageTransportResponseStatus.Ok;
@@ -234,7 +248,7 @@ namespace PushSharp.Android
 					if (singleResultNotification.RegistrationIds != null && singleResultNotification.RegistrationIds.Count > 0)
 						oldRegistrationId = singleResultNotification.RegistrationIds[0];
 
-					asyncParam.Callback(this, new SendNotificationResult(singleResultNotification, false, new DeviceSubscriptonExpiredException()) { OldSubscriptionId = oldRegistrationId, NewSubscriptionId = newRegistrationId });
+					asyncParam.Callback(this, new SendNotificationResult(singleResultNotification, false, new DeviceSubscriptonExpiredException()) { OldSubscriptionId = oldRegistrationId, NewSubscriptionId = newRegistrationId, IsSubscriptionExpired = true });
 				}
 				else if (r.ResponseStatus == GcmMessageTransportResponseStatus.Unavailable)
 				{
@@ -242,8 +256,13 @@ namespace PushSharp.Android
 				}
 				else if (r.ResponseStatus == GcmMessageTransportResponseStatus.NotRegistered)
 				{
+					var oldRegistrationId = string.Empty;
+					
+					if (singleResultNotification.RegistrationIds != null && singleResultNotification.RegistrationIds.Count > 0)
+						oldRegistrationId = singleResultNotification.RegistrationIds[0];
+
 					//Raise failure and device expired
-					asyncParam.Callback(this, new SendNotificationResult(singleResultNotification, false, new DeviceSubscriptonExpiredException()));
+					asyncParam.Callback(this, new SendNotificationResult(singleResultNotification, false, new DeviceSubscriptonExpiredException()) { OldSubscriptionId = oldRegistrationId, IsSubscriptionExpired = true, SubscriptionExpiryUtc = DateTime.UtcNow });
 				}
 				else
 				{
@@ -328,6 +347,11 @@ namespace PushSharp.Android
 				Thread.Sleep(100);
 			}
 		}
+
+        private static bool ValidateRemoteCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors policyErrors)
+        {
+            return policyErrors == SslPolicyErrors.None;
+        }
 
 		class GcmAsyncParameters
 		{

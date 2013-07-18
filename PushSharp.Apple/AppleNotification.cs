@@ -78,7 +78,14 @@ namespace PushSharp.Apple
 
 		public override string ToString()
 		{
-			return Payload.ToJson();
+			try
+			{ 
+				if (Payload != null)
+					return Payload.ToJson();
+			}
+			catch { }
+
+			return "{}";
 		}
 
 		public byte[] ToBytes()
@@ -100,6 +107,11 @@ namespace PushSharp.Apple
 
 			byte[] expiry = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(expiryTimeStamp));
 
+			if (string.IsNullOrEmpty (this.DeviceToken))
+				throw new NotificationFailureException (2, this);
+
+			if (!IsValidDeviceRegistrationId ())
+				throw new NotificationFailureException (8, this);
 
 			byte[] deviceToken = new byte[DeviceToken.Length / 2];
 			for (int i = 0; i < deviceToken.Length; i++)
@@ -138,8 +150,8 @@ namespace PushSharp.Apple
 			}
 			byte[] payloadSize = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(Convert.ToInt16(payload.Length)));
 
-			int bufferSize = sizeof(Byte) + deviceTokenSize.Length + deviceToken.Length + payloadSize.Length + payload.Length;
-			byte[] buffer = new byte[bufferSize];
+			//int bufferSize = sizeof(Byte) + deviceTokenSize.Length + deviceToken.Length + payloadSize.Length + payload.Length;
+			//byte[] buffer = new byte[bufferSize];
 
 			List<byte[]> notificationParts = new List<byte[]>();
 

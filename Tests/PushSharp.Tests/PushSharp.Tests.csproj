@@ -9,7 +9,6 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>PushSharp.Tests</RootNamespace>
     <AssemblyName>PushSharp.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
@@ -26,7 +25,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
@@ -36,6 +34,9 @@
   <ItemGroup>
     <Reference Include="Moq">
       <HintPath>..\..\packages\Moq.4.0.10827\lib\NET40\Moq.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\NUnit.2.6.2\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -48,9 +49,6 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\packages\Newtonsoft.Json.4.5.11\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="nunit.framework, Version=2.6.2.12296, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
-      <HintPath>..\..\packages\NUnit.2.6.2\lib\nunit.framework.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppleTests.cs" />
@@ -60,6 +58,9 @@
     <Compile Include="PushServiceTests.cs" />
     <Compile Include="TestServers\GcmTestServer.cs" />
     <Compile Include="TestServers\ApnsTestServer.cs" />
+    <Compile Include="GcmChromeTests.cs" />
+    <Compile Include="AmazonAdmTests.cs" />
+    <Compile Include="BlackberryTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -84,6 +85,18 @@
     <ProjectReference Include="..\..\PushSharp.Windows\PushSharp.Windows.csproj">
       <Project>{0EC3A31E-B869-4465-ABDC-90C2E3CCC17D}</Project>
       <Name>PushSharp.Windows</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\PushSharp.Google.Chrome\PushSharp.Google.Chrome.csproj">
+      <Project>{84961658-42B9-4943-B738-ABED75EDE303}</Project>
+      <Name>PushSharp.Google.Chrome</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\PushSharp.Amazon.Adm\PushSharp.Amazon.Adm.csproj">
+      <Project>{52154303-5315-494C-A741-2F0998795DC3}</Project>
+      <Name>PushSharp.Amazon.Adm</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\PushSharp.Blackberry\PushSharp.Blackberry.csproj">
+      <Project>{5250980B-BD11-4201-B083-AEDB8C62C471}</Project>
+      <Name>PushSharp.Blackberry</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

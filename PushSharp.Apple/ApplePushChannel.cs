@@ -76,7 +76,6 @@ namespace PushSharp.Apple
 		object sentLock = new object();
 		object connectLock = new object();
 		object streamWriteLock = new object();
-		object cleanupLock = new object();
 		int reconnectDelay = 3000;
 		float reconnectBackoffMultiplier = 1.5f;
 		
@@ -136,8 +135,8 @@ namespace PushSharp.Apple
 							if (!stillConnected)
 								throw new ObjectDisposedException("Connection to APNS is not Writable");
 								
-							lock (sentLock)
-							{
+							//lock (sentLock)
+							//{
 								if (notificationData.Length > 45)
 								{
 									networkStream.Write(notificationData, 0, 45);
@@ -149,7 +148,7 @@ namespace PushSharp.Apple
 								networkStream.Flush();
 
 								sentNotifications.Add(new SentNotification(appleNotification) {Callback = callback});
-							}
+							//}
 						}
 					}
 					catch (ConnectionFailureException cex)
@@ -211,13 +210,18 @@ namespace PushSharp.Apple
 
 			Log.Info("ApplePushChannel->DISPOSE.");
 		}
-		
+
+	    private IAsyncResult readAsyncResult = default(IAsyncResult);
+
 		void Reader()
 		{
 			try
 			{
-				var result = networkStream.BeginRead(readBuffer, 0, 6, new AsyncCallback((asyncResult) =>
-				{
+			    readAsyncResult = networkStream.BeginRead(readBuffer, 0, 6, new AsyncCallback((asyncResult) =>
+			    {
+			        if (readAsyncResult != asyncResult)
+			            return;
+
 					lock (sentLock)
 					{
 						try
@@ -232,8 +236,10 @@ namespace PushSharp.Apple
 								try { stream.Close(); stream.Dispose(); }
 								catch { }
 
-								try { client.Close(); stream.Dispose(); }
+								try { client.Close(); }
 								catch { }
+
+								client = null;
 
 								//Get the enhanced format response
 								// byte 0 is always '8', byte 1 is the status, bytes 2,3,4,5 are the identifier of the notification
@@ -321,7 +327,16 @@ namespace PushSharp.Apple
 			while (true)
 			{
 				lock(connectLock)
-					Connect();
+				{
+					//Connect could technically fail
+					try { Connect(); }
+					catch (Exception ex) 
+					{
+						var evt = this.OnException;
+						if (evt != null)
+							evt(this, ex);
+					}
+				}
 
 				bool wasRemoved = false;
 
@@ -440,6 +455,8 @@ namespace PushSharp.Apple
 			}
 		}
 
+	    private IAsyncResult connectAsyncResult = default(IAsyncResult);
+
 		void connect()
 		{
 			client = new TcpClient();
@@ -453,12 +470,16 @@ namespace PushSharp.Apple
 			{
 				var connectDone = new AutoResetEvent(false);
 			
+                
 				//Connect async so we can utilize a connection timeout
-				client.BeginConnect(
+			    connectAsyncResult = client.BeginConnect(
 					appleSettings.Host, appleSettings.Port,
 					new AsyncCallback(
 						delegate(IAsyncResult ar)
 						{
+						    if (connectAsyncResult != ar)
+						        return;
+
 							try
 							{
 								client.EndConnect(ar);
@@ -493,9 +514,20 @@ namespace PushSharp.Apple
 			}
 			else
 			{
+                RemoteCertificateValidationCallback userCertificateValidation;
+
+                if (appleSettings != null && appleSettings.ValidateServerCertificate)
+                {
+                    userCertificateValidation = ValidateRemoteCertificate;
+                }
+                else
+                {
+                    userCertificateValidation = (sender, cert, chain, sslPolicyErrors) => true; //Don't validate remote cert
+                } 
+
 				stream = new SslStream(client.GetStream(), false,
-					(sender, cert, chain, sslPolicyErrors) => true, //Don't validate remote cert
-					(sender, targetHost, localCerts, remoteCert, acceptableIssuers) => certificate); //
+                    userCertificateValidation,
+					(sender, targetHost, localCerts, remoteCert, acceptableIssuers) => certificate);
 
 				try
 				{
@@ -519,7 +551,11 @@ namespace PushSharp.Apple
 			//Start reading from the stream asynchronously
 			Reader();
 		}
-		
+
+        private static bool ValidateRemoteCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors policyErrors)
+        {
+            return policyErrors == SslPolicyErrors.None;
+        } 
 	}
 
 	public class SentNotification

@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,8 +13,13 @@ namespace PushSharp.Apple
 {
 	public class FeedbackService
 	{
-		public delegate void FeedbackReceivedDelegate(string deviceToken, DateTime timestamp);
+		public delegate void FeedbackReceivedDelegate (string deviceToken, DateTime timestamp);
+
 		public event FeedbackReceivedDelegate OnFeedbackReceived;
+
+		public delegate void FeedbackExceptionDelegate (Exception ex);
+
+		public event FeedbackExceptionDelegate OnFeedbackException;
 
 		public void RaiseFeedbackReceived(string deviceToken, DateTime timestamp)
 		{
@@ -23,9 +28,23 @@ namespace PushSharp.Apple
 				evt(deviceToken, timestamp);
 		}
 
+		public void RaiseFeedbackException(Exception ex)
+		{
+			var evt = this.OnFeedbackException;
+			if (evt != null)
+				evt(ex);
+		}
+
 		public void Run(ApplePushChannelSettings settings)
 		{
-			Run(settings, (new CancellationTokenSource()).Token);
+			try
+			{
+				Run(settings, (new CancellationTokenSource()).Token);
+			}
+			catch (Exception ex)
+			{
+				this.RaiseFeedbackException (ex);
+			}
 		}
 
 		public void Run(ApplePushChannelSettings settings, CancellationToken cancelToken)
@@ -73,8 +92,8 @@ namespace PushSharp.Apple
 
 					int tSeconds = BitConverter.ToInt32(bSeconds, 0);
 
-					//Add seconds since 1970 to that date, in UTC and then get it locally
-					var timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(tSeconds).ToLocalTime();
+					//Add seconds since 1970 to that date, in UTC
+					var timestamp = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(tSeconds);
 
 					//flag to allow feedback times in UTC or local, but default is local
 					if (!settings.FeedbackTimeIsUTC)
@@ -102,9 +121,23 @@ namespace PushSharp.Apple
 				//Read the next feedback
 				recd = stream.Read(buffer, 0, buffer.Length);
 			}
-			
 
-			
+			try
+			{
+				stream.Close ();
+				stream.Dispose();
+			}
+			catch { }
+
+			try 
+			{
+				client.Client.Shutdown (SocketShutdown.Both);
+				client.Client.Dispose ();
+			}
+			catch { }
+
+			try { client.Close (); } catch { }
+
 		}
 	}
 }

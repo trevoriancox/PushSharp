@@ -1,18 +1,21 @@
-PushSharp 2.x
-=============
+PushSharp
+=========
 
-A server-side library for sending Push Notifications to iOS (iPhone/iPad APNS), Android (C2DM and GCM - Google Cloud Message), Windows Phone, and Windows 8 devices!
+A server-side library for sending Push Notifications to iOS (iPhone/iPad APNS), OSX (APNS 10.8+) Android (C2DM and GCM - Google Cloud Message), Chrome (GCM) Windows Phone, Windows 8, Blackberry (PAP), and Amazon (ADM) devices!
 
 ![PushSharp Diagram](https://github.com/Redth/PushSharp/raw/master/Resources/PushSharp-Diagram.png)
 *********
 
-###Join me at Xamarin Evolve for a session on Push Notifications and PushSharp!###
-I will be presenting a session during the conference days at Xamarin Evolve in Austin, TX, April 14-17.  
-Visit [http://xamarin.com/evolve/](http://xamarin.com/evolve "Xamarin.com/Evolve") for more info!
+###PushSharp was at Evolve 2013!###
+I was fortunate enough to attend and present at Evolve 2013 in Austin, and the video is now online! [http://xamarin.com/evolve/2013#session-b8fz8gfsnf](http://xamarin.com/evolve/2013#session-b8fz8gfsnf)
 
 
 News
 ----
+
+**June 3, 2013** Xamarin Evolve video on PushSharp is now online! [http://xamarin.com/evolve/2013#session-b8fz8gfsnf](http://xamarin.com/evolve/2013#session-b8fz8gfsnf)
+
+**May 31, 2013** 2.1.1-beta is released!  See the release notes below...
 
 **March 19, 2013** 2.0 is released! See the release notes below...
 
@@ -25,8 +28,11 @@ Features
  - Supports sending push notifications for many platforms:
    - Apple (APNS - iPhone, iPad, Mountain Lion)
    - Android (GCM/C2DM - Phones/Tablets)
+   - Chrome (GCM)
+   - Amazon (ADM - Amazon Device Messaging)
    - Windows Phone 7 / 7.5 / 8 (including FlipTile, CycleTile, and IconicTile Templates!)
    - Windows 8
+   - Blackberry (BIS and BES via PAP)
    - Firefox OS (Coming soon)
  - Fluent API for constructing Notifications for each platform
  - Auto Scaling of notification channels (more workers/connections are added as demand increases, and scaled down as it decreases)
@@ -81,6 +87,20 @@ push.QueueNotification(new GcmNotification().ForDeviceRegistrationId("DEVICE REG
 Please see the PushSharp.Sample project for a more thorough example!
 
 ********************
+
+v2.1 BETA Release Notes
+------------------
+
+v2.1 is still BETA.  For iOS, Android, Windows, and Windows phone it should be quite stable still, however this is a first release of Blackberry and Amazon support!
+
+**Changes**
+
+ - Amazon Device Messaging support
+ - Chrome GCM support
+ - Blackberry BIS (and BES in theory) support
+ - Performance enhancements
+ - Other bugfixes
+ 
 
 v2.0 Release Notes
 ------------------

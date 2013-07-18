@@ -13,6 +13,7 @@ namespace PushSharp
 		public event ChannelDestroyedDelegate OnChannelDestroyed;
 		public event NotificationSentDelegate OnNotificationSent;
 		public event NotificationFailedDelegate OnNotificationFailed;
+		public event NotificationRequeueDelegate OnNotificationRequeue;
 		public event ChannelExceptionDelegate OnChannelException;
 		public event ServiceExceptionDelegate OnServiceException;
 		public event DeviceSubscriptionExpiredDelegate OnDeviceSubscriptionExpired;
@@ -40,13 +41,14 @@ namespace PushSharp
 			pushService.OnDeviceSubscriptionExpired += OnDeviceSubscriptionExpired;
 			pushService.OnNotificationFailed += OnNotificationFailed;
 			pushService.OnNotificationSent += OnNotificationSent;
+			pushService.OnNotificationRequeue += OnNotificationRequeue;
 			pushService.OnServiceException += OnServiceException;
 			pushService.OnDeviceSubscriptionChanged += OnDeviceSubscriptionChanged;
 		}
 
 		public void QueueNotification<TPushNotification>(TPushNotification notification) where TPushNotification : Notification
 		{
-			var pushNotificationType = typeof (TPushNotification);
+			var pushNotificationType = notification.GetType ();
 
 			if (registeredServices.ContainsKey(pushNotificationType))
 				registeredServices[pushNotificationType].ForEach(pushService => pushService.QueueNotification(notification));

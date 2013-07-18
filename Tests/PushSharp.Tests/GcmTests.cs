@@ -15,7 +15,19 @@ namespace PushSharp.Tests
 	{
 		private int testPort = 2000;
 
-		[Test]
+        [SetUp]
+        public void Setup()
+        {
+            PushSharp.Core.Log.Level = LogLevel.Info;
+        }
+
+	    [Test]
+	    public void GCM_All_ShouldSucceed_VeryMany()
+	    {
+            TestNotifications(false, 100000, 100000, 0, null, true);
+	    }
+
+        [Test]
 		public void GCM_All_ShouldSucceed()
 		{
 			TestNotifications(false, 10, 10, 0);
@@ -110,8 +122,91 @@ namespace PushSharp.Tests
 			TestNotifications(false, 1, 1, 0);
 		}
 
+		[Test]
+		public void GCM_Subscription_ShouldBeExpired()
+		{
+			int msgIdOn = 1;
 
-		public void TestNotifications(bool shouldBatch, int toQueue, int expectSuccessful, int expectFailed, int[] indexesToFail = null)
+			int pushFailCount = 0;
+			int pushSuccessCount = 0;
+			int subChangedCount = 0;
+			int subExpiredCount = 0;
+
+			var notifications = new List<GcmNotification>() {
+				new GcmNotification().ForDeviceRegistrationId("NOTREGISTERED").WithJson(@"{""key"":""value""}")
+			};
+
+			TestNotifications(notifications,
+				new List<GcmMessageResponseFilter>() {
+					new GcmMessageResponseFilter()
+					{
+						IsMatch = (request, s) => {
+							return s.Equals("NOTREGISTERED", StringComparison.InvariantCultureIgnoreCase);
+						},
+						Status = new GcmMessageResult() { 
+							ResponseStatus = GcmMessageTransportResponseStatus.NotRegistered,
+							MessageId = "1:" + msgIdOn++
+						}
+					}
+				},
+				(sender, notification) => pushSuccessCount++, //Success
+				(sender, notification, error) => pushFailCount++, //Failed
+				(sender, oldId, newId, notification) => subChangedCount++,
+				(sender, id, expiryDate, notification) => subExpiredCount++
+			);
+
+			Assert.AreEqual(0, pushFailCount, "Client - Failed Count");
+			Assert.AreEqual(0, pushSuccessCount, "Client - Success Count");
+			Assert.AreEqual(0, subChangedCount, "Client - SubscriptionId Changed Count");
+			Assert.AreEqual(notifications.Count, subExpiredCount, "Client - SubscriptionId Expired Count");
+
+            Console.WriteLine("{0} Successful, {1} Failed", pushSuccessCount, pushFailCount);
+
+        }
+
+
+		[Test]
+		public void GCM_Subscription_ShouldBeChanged()
+		{
+			int msgIdOn = 1;
+			
+			int pushFailCount = 0;
+			int pushSuccessCount = 0;
+			int subChangedCount = 0;
+			int subExpiredCount = 0;
+			
+			var notifications = new List<GcmNotification>() {
+				new GcmNotification().ForDeviceRegistrationId("NOTREGISTERED").WithJson(@"{""key"":""value""}")
+			};
+			
+			TestNotifications(notifications,
+			                  new List<GcmMessageResponseFilter>() {
+				new GcmMessageResponseFilter()
+				{
+					IsMatch = (request, s) => {
+						return s.Equals("NOTREGISTERED", StringComparison.InvariantCultureIgnoreCase);
+					},
+					Status = new GcmMessageResult() { 
+						ResponseStatus = GcmMessageTransportResponseStatus.NotRegistered,
+						CanonicalRegistrationId = "NEWID",
+						MessageId = "1:" + msgIdOn++
+					}
+				}
+			},
+			(sender, notification) => pushSuccessCount++, //Success
+			(sender, notification, error) => pushFailCount++, //Failed
+			(sender, oldId, newId, notification) => subChangedCount++,
+			(sender, id, expiryDate, notification) => subExpiredCount++
+			);
+			
+			Assert.AreEqual(0, pushFailCount, "Client - Failed Count");
+			Assert.AreEqual(0, pushSuccessCount, "Client - Success Count");
+			Assert.AreEqual(notifications.Count, subChangedCount, "Client - SubscriptionId Changed Count");
+			Assert.AreEqual(0, subExpiredCount, "Client - SubscriptionId Expired Count");
+		}
+
+
+		public void TestNotifications(bool shouldBatch, int toQueue, int expectSuccessful, int expectFailed, int[] indexesToFail = null, bool waitForScaling = false)
 		{
 			testPort++;
 
@@ -139,6 +234,16 @@ namespace PushSharp.Tests
 				}
 			});
 
+			server.MessageResponseFilters.Add(new GcmMessageResponseFilter()
+			                                  {
+				IsMatch = (request, s) => {
+					return s.Equals("NOTREGISTERED", StringComparison.InvariantCultureIgnoreCase);
+				},
+				Status = new GcmMessageResult() { 
+					ResponseStatus = GcmMessageTransportResponseStatus.NotRegistered,
+					MessageId = "1:" + msgIdOn++
+				}
+			});
 			//var waitServerFinished = new ManualResetEvent(false);
 			
 			server.Start(testPort, response =>
@@ -154,10 +259,28 @@ namespace PushSharp.Tests
 			settings.OverrideUrl("http://localhost:" + (testPort) + "/");
 
 			var push = new GcmPushService(settings);
-			push.OnNotificationSent += (sender, notification1) => pushSuccessCount++;
+			push.OnNotificationSent += (sender, notification1) =>
+			    {
+			        pushSuccessCount++;
+                  //  if (DateTime.UtcNow.Second % 10 == 0)
+                    //    Console.WriteLine("Success: " + pushSuccessCount);
+			    };
 			push.OnNotificationFailed += (sender, notification1, error) => {
-				                                                               pushFailCount++;
+                    pushFailCount++;
+                    //if (DateTime.UtcNow.Second % 10 == 0)
+                      //  Console.WriteLine("Failed: " + pushFailCount);
 			};
+		    push.OnNotificationRequeue += (sender, args) =>
+		        {
+		            Console.WriteLine("REQUEUEING");
+		        };
+		    push.OnChannelException += (sender, channel, error) =>
+		        {
+                    Console.WriteLine("ERROR: " + error);
+		        };
+
+            //push.ServiceSettings.AutoScaleChannels = false;
+            //push.ServiceSettings.Channels = 10;
 
 			var json = @"{""key"":""value1""}";
 
@@ -182,7 +305,26 @@ namespace PushSharp.Tests
 						.WithJson(json));
 			}
 
-			push.Stop();
+			
+
+			
+
+            Console.WriteLine("Avg Queue Wait Time: " + push.AverageQueueWaitTime + " ms");
+            Console.WriteLine("Avg Send Time: " + push.AverageSendTime + " ms");
+
+            if (waitForScaling)
+            {
+               while (push.QueueLength > 0)
+                   Thread.Sleep(500);
+
+                Console.WriteLine("Sleeping 3 minutes for autoscaling...");
+                Thread.Sleep(TimeSpan.FromMinutes(3));
+
+                Console.WriteLine("Channel Count: " + push.ChannelCount);
+                Assert.IsTrue(push.ChannelCount <= 1);
+            }
+
+            push.Stop();
 			push.Dispose();
 
 			server.Dispose();
@@ -196,6 +338,71 @@ namespace PushSharp.Tests
 
 			Assert.AreEqual(expectFailed, pushFailCount, "Client - Failed Count");
 			Assert.AreEqual(expectSuccessful, pushSuccessCount, "Client - Success Count");
+		}
+
+
+
+
+		public void TestNotifications(List<GcmNotification> notifications,
+		                              List<GcmMessageResponseFilter> responseFilters,
+		                              Action<object, INotification> sentCallback,
+		                              Action<object, INotification, Exception> failedCallback,
+		                              Action<object, string, string, INotification> subscriptionChangedCallback,
+		                              Action<object, string, DateTime, INotification> subscriptionExpiredCallback)
+		{
+			testPort++;
+
+			int pushFailCount = 0;
+			int pushSuccessCount = 0;
+			
+			int serverReceivedCount = 0;
+			int serverReceivedFailCount = 0;
+			int serverReceivedSuccessCount = 0;
+
+		
+			var server = new TestServers.GcmTestServer();
+
+			server.MessageResponseFilters.AddRange(responseFilters);
+
+			server.Start(testPort, response => {
+				serverReceivedCount += (int)response.NumberOfCanonicalIds;
+				serverReceivedSuccessCount += (int) response.NumberOfSuccesses;
+				serverReceivedFailCount += (int) response.NumberOfFailures;
+			});
+
+
+		    var svcSettings = new PushServiceSettings() {AutoScaleChannels = false, Channels = 1};
+			
+			var settings = new GcmPushChannelSettings("SENDERAUTHTOKEN");
+			settings.OverrideUrl("http://localhost:" + (testPort) + "/");
+           
+			var push = new GcmPushService(settings, svcSettings);
+			push.OnNotificationSent += (sender, notification1) => {
+				pushSuccessCount++;
+				sentCallback(sender, notification1);
+			};
+			push.OnNotificationFailed += (sender, notification1, error) => {
+				pushFailCount++;
+				failedCallback(sender, notification1, error);
+			};
+			push.OnDeviceSubscriptionChanged += (sender, oldSubscriptionId, newSubscriptionId, notification) => subscriptionChangedCallback(sender, oldSubscriptionId, newSubscriptionId, notification);
+			push.OnDeviceSubscriptionExpired += (sender, expiredSubscriptionId, expirationDateUtc, notification) => subscriptionExpiredCallback(sender, expiredSubscriptionId, expirationDateUtc, notification);
+
+
+			foreach (var n in notifications)
+				push.QueueNotification(n);
+
+			push.Stop();
+
+            Console.WriteLine("Avg Queue Wait Time: " + push.AverageQueueWaitTime + " ms");
+            Console.WriteLine("Avg Send Time: " + push.AverageSendTime + " ms");
+
+			push.Dispose();
+			
+			server.Dispose();
+			//waitServerFinished.WaitOne();
+			
+			Console.WriteLine("TEST-> DISPOSE.");
 		}
 	}
 }
