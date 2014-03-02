@@ -55,6 +55,8 @@
     <Compile Include="PushServiceBase.cs" />
     <Compile Include="PushServiceSettings.cs" />
     <Compile Include="SendNotificationResult.cs" />
+    <Compile Include="NotificationQueue.cs" />
+    <Compile Include="ServiceRegistration.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="PushSharp-Signing.snk" />

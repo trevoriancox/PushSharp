@@ -52,6 +52,7 @@ namespace PushSharp.Core
 		int Channels { get; set; }
 		int MaxNotificationRequeues { get; set; }
 		int NotificationSendTimeout { get; set; }
+		TimeSpan IdleTimeout { get;set; }
 	}
 
 	public interface INotification
@@ -60,5 +61,13 @@ namespace PushSharp.Core
 		int QueuedCount { get; set; }
 		bool IsValidDeviceRegistrationId();
 		DateTime EnqueuedTimestamp { get; set; }
+	}
+
+	public interface ILogger
+	{
+		void Debug (string format, params object[] objs);
+		void Info (string format, params object[] objs);
+		void Warning (string format, params object[] objs);
+		void Error (string format, params object[] objs);
 	}
 }

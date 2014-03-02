@@ -11,7 +11,7 @@ namespace PushSharp.Apple
 {
 	public class AppleNotification : Core.Notification
 	{
-		static object nextIdentifierLock = new object();
+		static readonly object nextIdentifierLock = new object();
 		static int nextIdentifier = 0;
 
 		static int GetNextIdentifier()
@@ -23,6 +23,15 @@ namespace PushSharp.Apple
 
 				return nextIdentifier++;
 			}
+		}
+
+		/// <summary>
+		/// DO NOT Call this unless you know what you are doing!
+		/// </summary>
+		public static void ResetIdentifier()
+		{
+			lock(nextIdentifierLock)
+				nextIdentifier = 0;
 		}
 
 		public int Identifier { get; private set; }

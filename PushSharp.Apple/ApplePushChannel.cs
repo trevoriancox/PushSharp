@@ -40,6 +40,7 @@ namespace PushSharp.Apple
 		ApplePushChannelSettings appleSettings = null;
 		List<SentNotification> sentNotifications = new List<SentNotification>();
 
+		private int cleanupSync;
 		private Timer timerCleanup;
 		
 		public ApplePushChannel(ApplePushChannelSettings channelSettings)
@@ -71,17 +72,18 @@ namespace PushSharp.Apple
 
 		}
 
-		
+		int cleanedUp = 0;
+		int reconnects = 0;
+
 		int connectionAttemptCounter = 0;
-		object sentLock = new object();
-		object connectLock = new object();
-		object streamWriteLock = new object();
+		readonly object sentLock = new object();
+		readonly object connectLock = new object();
+		readonly object streamWriteLock = new object();
 		int reconnectDelay = 3000;
 		float reconnectBackoffMultiplier = 1.5f;
 		
 		byte[] readBuffer = new byte[6];
 		volatile bool connected = false;
-		volatile bool isInCleanup = false;
 
 		X509Certificate certificate;
 		X509CertificateCollection certificates;
@@ -116,62 +118,56 @@ namespace PushSharp.Apple
 					
 					if (callback != null)
 						callback(this, new SendNotificationResult(notification, false, nfex));
-				}
-				
 
-				if (isOkToSend)
+					return;
+				}
+
+				try
 				{
-					try
+					lock (connectLock)
+						Connect();
+
+					lock (streamWriteLock)
 					{
-						lock (connectLock)
-							Connect();
+						bool stillConnected = client.Connected
+										&& client.Client.Poll(0, SelectMode.SelectWrite)
+										&& networkStream.CanWrite;
 
-						lock (streamWriteLock)
-						{
-							bool stillConnected = client.Connected
-											&& client.Client.Poll(0, SelectMode.SelectWrite)
-											&& networkStream.CanWrite;
+						if (!stillConnected)
+							throw new ObjectDisposedException("Connection to APNS is not Writable");
+							
+						//if (notificationData.Length > 45)
+						//{
+						//	networkStream.Write(notificationData, 0, 45);
+						//	networkStream.Write(notificationData, 45, notificationData.Length - 45);
+						//}
+						//else
+						networkStream.Write(notificationData, 0, notificationData.Length);
 
-							if (!stillConnected)
-								throw new ObjectDisposedException("Connection to APNS is not Writable");
-								
-							//lock (sentLock)
-							//{
-								if (notificationData.Length > 45)
-								{
-									networkStream.Write(notificationData, 0, 45);
-									networkStream.Write(notificationData, 45, notificationData.Length - 45);
-								}
-								else
-									networkStream.Write(notificationData, 0, notificationData.Length);
-								
-								networkStream.Flush();
+						networkStream.Flush();
 
-								sentNotifications.Add(new SentNotification(appleNotification) {Callback = callback});
-							//}
-						}
-					}
-					catch (ConnectionFailureException cex)
-					{
-						connected = false;
+						sentNotifications.Add(new SentNotification(appleNotification) {Callback = callback});
 
-						//If this failed, we probably had a networking error, so let's requeue the notification
-						Interlocked.Decrement(ref trackedNotificationCount);
 
-						if (callback != null)
-							callback(this, new SendNotificationResult(notification, false, cex));
-					}
-					catch (Exception ex)
-					{
-						connected = false;
-
-						//If this failed, we probably had a networking error, so let's requeue the notification
-						Interlocked.Decrement(ref trackedNotificationCount);
-
-						if (callback != null)
-							callback(this, new SendNotificationResult(notification, true, ex));
+						Thread.Sleep(1);
+						//Cleanup();
 					}
 				}
+				catch (Exception ex)
+				{
+					connected = false;
+
+					//If this failed, we probably had a networking error, so let's requeue the notification
+					Interlocked.Decrement(ref trackedNotificationCount);
+
+					Log.Error ("Exception during APNS Send: {0} -> {1}", appleNotification.Identifier, ex);
+
+					var shouldRequeue = true;
+
+					if (callback != null)
+						callback(this, new SendNotificationResult(notification, shouldRequeue, ex));
+				}
+
 			}
 
 		}
@@ -183,16 +179,6 @@ namespace PushSharp.Apple
 
 			Log.Info("ApplePushChannel->Waiting...");
 
-			timerCleanup.Change(Timeout.Infinite, Timeout.Infinite);
-
-			try
-			{
-				Cleanup();
-			}
-			catch
-			{
-			}
-
 			//See if we want to wait for the queue to drain before stopping
 			var sentNotificationCount = 0;
 			lock (sentLock)
@@ -200,14 +186,21 @@ namespace PushSharp.Apple
 
 			while (sentNotificationCount > 0 || Interlocked.Read(ref trackedNotificationCount) > 0)
 			{
+				Cleanup ();
+
 				Thread.Sleep(100);
 	
 				lock (sentLock)
 					sentNotificationCount = sentNotifications.Count;
 			}
 
+			Cleanup ();
+
+			timerCleanup.Change (Timeout.Infinite, Timeout.Infinite);
+
 			cancelTokenSrc.Cancel();
 
+			Log.Info ("ApplePushChannel: Cleaned up {0}, Reconnects: {1}", cleanedUp, reconnects);
 			Log.Info("ApplePushChannel->DISPOSE.");
 		}
 
@@ -233,13 +226,7 @@ namespace PushSharp.Apple
 								//We now expect apple to close the connection on us anyway, so let's try and close things
 								// up here as well to get a head start
 								//Hopefully this way we have less messages written to the stream that we have to requeue
-								try { stream.Close(); stream.Dispose(); }
-								catch { }
-
-								try { client.Close(); }
-								catch { }
-
-								client = null;
+								disconnect();
 
 								//Get the enhanced format response
 								// byte 0 is always '8', byte 1 is the status, bytes 2,3,4,5 are the identifier of the notification
@@ -280,112 +267,126 @@ namespace PushSharp.Apple
 		{
 			//Get the index of our failed notification (by identifier)
 			var failedIndex = sentNotifications.FindIndex(n => n.Identifier == identifier);
-			
+
 			if (failedIndex < 0)
 				return;
 
+			Log.Info ("Failed Notification: {0}", identifier);
+
+			//Get all the notifications before the failed one and mark them as sent!
+			if (failedIndex > 0)
+			{
+				var successful = sentNotifications.GetRange (0, failedIndex);
+
+				successful.ForEach (n => {
+					Interlocked.Decrement(ref trackedNotificationCount);
+
+					if (n.Callback != null)
+						n.Callback(this, new SendNotificationResult(n.Notification));
+				});
+
+				sentNotifications.RemoveRange (0, failedIndex);
+			}
+
 			//Get the failed notification itself
-			var failedNotification = sentNotifications[failedIndex];
-			
+			var failedNotification = sentNotifications[0];
+						
 			//Fail and remove the failed index from the list
 			Interlocked.Decrement(ref trackedNotificationCount);
 
 			if (failedNotification.Callback != null)
 				failedNotification.Callback(this, new SendNotificationResult(failedNotification.Notification, false, new NotificationFailureException(status, failedNotification.Notification) ));
 
-			sentNotifications.RemoveAt(failedIndex);
+			sentNotifications.RemoveAt(0);
 
-			//Don't GetRange if there's 0 items to get, or the call will fail
-			if (sentNotifications.Count - (failedIndex) > 0)
-			{
-				//All Notifications after the failed one have been shifted back one space now
-				//Grab all the notifications from the list that are after the failed index
-				var toRequeue = sentNotifications.GetRange(failedIndex, sentNotifications.Count - (failedIndex)).ToList();
-				//Remove that same range (those ones failed since they were sent after the one apple told us failed, so
-				// apple will ignore them, and we need to requeue them to be tried again
-				sentNotifications.RemoveRange(failedIndex, sentNotifications.Count - (failedIndex));
+			sentNotifications.Reverse ();
+			sentNotifications.ForEach (n => {
+				Interlocked.Decrement(ref trackedNotificationCount);
 
-				//Requeue all the messages that were sent afte the failed one, be sure it doesn't count as a 'requeue' to go towards the maximum # of retries
-				//Also ignore that the channel is stopping
-				foreach (var n in toRequeue)
-				{
-					Interlocked.Decrement(ref trackedNotificationCount);
+				if (failedNotification.Callback != null)
+					failedNotification.Callback(this, new SendNotificationResult(n.Notification, true, new Exception("Sent after previously failed Notification.")) { CountsAsRequeue = false });
 
-					if (failedNotification.Callback != null)
-						failedNotification.Callback(this, new SendNotificationResult(n.Notification, true, new Exception("Sent after previously failed Notification.")) { CountsAsRequeue = false });
-				}
-			}
+			});
+
+			sentNotifications.Clear ();
 		}
 		
 		void Cleanup()
 		{
-			if (isInCleanup)
-				return;
+			int sync = -1;
 
-			isInCleanup = true;
-			
-			while (true)
+			try
 			{
-				lock(connectLock)
-				{
-					//Connect could technically fail
-					try { Connect(); }
-					catch (Exception ex) 
-					{
-						var evt = this.OnException;
-						if (evt != null)
-							evt(this, ex);
-					}
-				}
+				sync = Interlocked.CompareExchange(ref cleanupSync, 1, 0);
 
-				bool wasRemoved = false;
-
-				lock (sentLock)
+				if (sync == 0)
 				{
-					//See if anything is here to process
-					if (sentNotifications.Count > 0)
+					while (true)
 					{
-						//Don't expire any notifications while we are in a connecting state, o rat least ensure all notifications have been sent
-						// in case we may have no connection because no notifications were causing a connection to be initiated
-						if (connected)
+						lock(connectLock)
 						{
-							//Get the oldest sent message
-							var n = sentNotifications[0];
-
-							//If it was sent more than 3 seconds ago,
-							// we have to assume it was sent successfully!
-							if (n.SentAt < DateTime.UtcNow.AddMilliseconds(-1 * appleSettings.MillisecondsToWaitBeforeMessageDeclaredSuccess))
+							//Connect could technically fail
+							try { Connect(); }
+							catch (Exception ex) 
 							{
-								wasRemoved = true;
-								
-								Interlocked.Decrement(ref trackedNotificationCount);
-
-								if (n.Callback != null)
-									n.Callback(this, new SendNotificationResult(n.Notification));
-
-								sentNotifications.RemoveAt(0);
+								var evt = this.OnException;
+								if (evt != null)
+									evt(this, ex);
 							}
-							else
-								wasRemoved = false;
 						}
-						else
+
+						bool wasRemoved = false;
+
+						lock (sentLock)
 						{
-							//In fact, if we weren't connected, bump up the sentat timestamp
-							// so that we wait awhile after reconnecting to expire this message
-							try { sentNotifications[0].SentAt = DateTime.UtcNow; }
-							catch { }
+							//See if anything is here to process
+							if (sentNotifications.Count > 0)
+							{
+								//Don't expire any notifications while we are in a connecting state, o rat least ensure all notifications have been sent
+								// in case we may have no connection because no notifications were causing a connection to be initiated
+								if (connected)
+								{
+									//Get the oldest sent message
+									var n = sentNotifications[0];
+
+									//If it was sent more than 3 seconds ago,
+									// we have to assume it was sent successfully!
+									if (n.SentAt < DateTime.UtcNow.AddMilliseconds(-1 * appleSettings.MillisecondsToWaitBeforeMessageDeclaredSuccess))
+									{
+										wasRemoved = true;
+
+										Interlocked.Decrement(ref trackedNotificationCount);
+
+										if (n.Callback != null)
+											n.Callback(this, new SendNotificationResult(n.Notification));
+
+										sentNotifications.RemoveAt(0);
+
+										Interlocked.Increment(ref cleanedUp);
+									}
+									else
+										wasRemoved = false;
+								}
+								else
+								{
+									//In fact, if we weren't connected, bump up the sentat timestamp
+									// so that we wait awhile after reconnecting to expire this message
+									try { sentNotifications[0].SentAt = DateTime.UtcNow; }
+									catch { }
+								}
+							}
 						}
+
+						if (!wasRemoved)
+							break; // Thread.Sleep(250);
 					}
 				}
-
-				//if (this.cancelToken.IsCancellationRequested)
-				//	break;
-				//else
-				if (!wasRemoved)
-					break; // Thread.Sleep(250);
 			}
-
-			isInCleanup = false;
+			finally
+			{
+				if (sync == 0)
+					cleanupSync = 0;
+			}
 		}
 	
 		void Connect()
@@ -459,6 +460,9 @@ namespace PushSharp.Apple
 
 		void connect()
 		{
+			if (client != null)
+				disconnect ();
+
 			client = new TcpClient();
 
 			//Notify we are connecting
@@ -485,7 +489,13 @@ namespace PushSharp.Apple
 								client.EndConnect(ar);
 
 								//Set keep alive on the socket may help maintain our APNS connection
-								client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+								//client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+								//Really not sure if this will work on MONO....
+								try { client.SetSocketKeepAliveValues(20 * 60 * 1000, 30 * 1000); }
+								catch { }
+
+								Interlocked.Increment(ref reconnects);
 
 								//Trigger the reset event so we can continue execution below
 								connectDone.Set();
@@ -552,6 +562,23 @@ namespace PushSharp.Apple
 			Reader();
 		}
 
+		void disconnect()
+		{
+			//We now expect apple to close the connection on us anyway, so let's try and close things
+			// up here as well to get a head start
+			//Hopefully this way we have less messages written to the stream that we have to requeue
+			try { stream.Close(); } catch { }
+			try { stream.Dispose(); } catch { }
+
+			try { client.Client.Shutdown (SocketShutdown.Both); } catch { }
+			try { client.Client.Dispose (); } catch { }
+
+			try { client.Close (); } catch { }
+
+			client = null;
+			stream = null;
+		}
+
         private static bool ValidateRemoteCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors policyErrors)
         {
             return policyErrors == SslPolicyErrors.None;
@@ -575,4 +602,33 @@ namespace PushSharp.Apple
 
 		public SendNotificationCallbackDelegate Callback { get; set; }
 	}
+
+	public static class TcpExtensions
+	{
+		/// <summary>
+		/// Using IOControl code to configue socket KeepAliveValues for line disconnection detection(because default is toooo slow) 
+		/// </summary>
+		/// <param name="tcpc">TcpClient</param>
+		/// <param name="KeepAliveTime">The keep alive time. (ms)</param>
+		/// <param name="KeepAliveInterval">The keep alive interval. (ms)</param>
+		public static void SetSocketKeepAliveValues(this TcpClient tcpc, int KeepAliveTime, int KeepAliveInterval)
+		{
+			//KeepAliveTime: default value is 2hr
+			//KeepAliveInterval: default value is 1s and Detect 5 times
+
+			uint dummy = 0; //lenth = 4
+			byte[] inOptionValues = new byte[System.Runtime.InteropServices.Marshal.SizeOf(dummy) * 3]; //size = lenth * 3 = 12
+			bool OnOff = true;
+
+			BitConverter.GetBytes((uint)(OnOff ? 1 : 0)).CopyTo(inOptionValues, 0);
+			BitConverter.GetBytes((uint)KeepAliveTime).CopyTo(inOptionValues, System.Runtime.InteropServices.Marshal.SizeOf(dummy));
+			BitConverter.GetBytes((uint)KeepAliveInterval).CopyTo(inOptionValues, System.Runtime.InteropServices.Marshal.SizeOf(dummy) * 2);
+			// of course there are other ways to marshal up this byte array, this is just one way
+			// call WSAIoctl via IOControl
+
+			// .net 3.5 type
+			tcpc.Client.IOControl(IOControlCode.KeepAliveValues, inOptionValues, null);
+		}
+	}
 }
+
